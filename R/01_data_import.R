@@ -170,7 +170,16 @@ CT <-
   relocate(minor, .after = major) |> 
   left_join(CT_geom, by = "TongfenUID") |> 
   rename(census_tract = TongfenID) |> 
-  select(-TongfenUID)
+  select(-TongfenUID) |> 
+  st_as_sf()
+
+CT_geom <- 
+  CT |> 
+  select(census_tract, geometry)
+
+CT <- 
+  CT |> 
+  st_drop_geometry()
 
 
 # Clean data --------------------------------------------------------------
@@ -219,7 +228,7 @@ CT <-
 
 CT_final <-
   CT |> 
-  pivot_wider(names_from = year, values_from = 3:72) |> 
+  pivot_wider(names_from = year, values_from = 3:71) |> 
   select(-value_change_2006, -value_change2_2006, -income_change_2006,
          -income_change2_2006, -racialized_change_2006, -transition_2006,
          -neighbourhood_type_2006) |> 
@@ -237,3 +246,38 @@ CT_final <-
          white_transition = neighbourhood_type == "white_transition",
          mixed_stable = neighbourhood_type == "mixed_stable",
          mixed_transition = neighbourhood_type == "mixed_transition")
+
+
+# Add new race variable ---------------------------------------------------
+
+CT_final <- 
+  CT_final |> 
+  mutate(black_ratio_2006 = p_black_2006 / 
+           (sum(p_black_2006 * total_race_2006, na.rm = TRUE) / 
+              sum(total_race_2006, na.rm = TRUE)),
+         black_ratio_2016 = p_black_2016 / 
+           (sum(p_black_2016 * total_race_2016, na.rm = TRUE) / 
+              sum(total_race_2016, na.rm = TRUE)))
+
+CT_final <- 
+  CT_final |> 
+  mutate(black_ratio_change = black_ratio_2016 - black_ratio_2006)
+
+
+# Add distance to Parliament Hill -----------------------------------------
+
+ph <- st_point(c(-75.70055444964218, 45.42343521835774)) |> 
+  st_sfc(crs = 4326) |> 
+  st_transform(32618)
+
+ph_dist <- 
+  CT_geom |> 
+  distinct(census_tract, .keep_all = TRUE) |> 
+  mutate(ph_dist = as.numeric(st_distance(st_transform(geometry, 32618), ph))) |> 
+  st_drop_geometry()
+
+CT_final <- 
+  CT_final |> 
+  left_join(ph_dist, by = "census_tract")
+
+CT_final$ph_dist
