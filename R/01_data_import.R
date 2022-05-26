@@ -46,6 +46,7 @@ vec_2006 <- c(
   duplex = "v_CA06_123", # This was previously called "apartment"
   big_apartment = "v_CA06_124",
   small_apartment = "v_CA06_125",
+  rent = "v_CA06_2050",
   value = "v_CA06_2054",
   occupied_dwellings = "v_CA06_101",
   owned = "v_CA06_102",
@@ -105,9 +106,10 @@ vec_2016 <- c(
   detached = "v_CA16_409",
   semidetached = "v_CA16_412",
   row = "v_CA16_413",
-  duplex = "v_CA16_414", # Previously had "apartment" (v_CA06_123) which was actually duplex
+  duplex = "v_CA16_414",
   big_apartment = "v_CA16_410", 
   small_apartment = "v_CA16_415",
+  rent = "v_CA16_4901",
   value = "v_CA16_4896",
   occupied_dwellings = "v_CA16_4836",
   owned = "v_CA16_4837",
@@ -139,7 +141,7 @@ names(vec_2006) <- paste(names(vec_2006), "2006", sep = "___")
 names(vec_2016) <- paste(names(vec_2016), "2016", sep = "___")
 
 CT_raw <- get_tongfen_ca_census(
-  regions = list(CMA = "505"), 
+  regions = list(CMA = c("35535", "24462", "59933", "48825", "505", "48835")), 
   meta = meta_for_ca_census_vectors(c(vec_2006, vec_2016)),
   level = "CT",
   base_geo = "CA16")
@@ -171,6 +173,14 @@ CT <-
   left_join(CT_geom, by = "TongfenUID") |> 
   rename(census_tract = TongfenID) |> 
   select(-TongfenUID) |> 
+  mutate(city = substr(census_tract, 1, 3), .after = census_tract) |> 
+  mutate(city = case_when(
+    city == "462" ~ "Montreal",
+    city == "505" ~ "Ottawa",
+    city == "535" ~ "Toronto",
+    city == "825" ~ "Calgary",
+    city == "835" ~ "Edmonton",
+    city == "933" ~ "Vancouver")) |> 
   st_as_sf()
 
 CT_geom <- 
@@ -202,50 +212,30 @@ CT <-
 
 CT <- 
   CT |> 
-  # Create change in value and p_racialized for 2016
+  # Create change in rent, value, income and p_racialized for 2016
   group_by(census_tract) |> 
-  mutate(value_change = value - value[year == "2006"], 
-         value_change2 = value_change / value[year == "2006"],
+  mutate(rent_change = rent - rent[year == "2006"], 
+         rent_change_pct = rent_change / rent[year == "2006"],
+         value_change = value - value[year == "2006"], 
+         value_change_pct = value_change / value[year == "2006"],
          income_change = income - income[year == "2006"],
-         income_change2 = income_change / income[year == "2006"],
+         income_change_pct = income_change / income[year == "2006"],
          racialized_change = p_racialized - p_racialized[year == "2006"]) |> 
-  ungroup() |> 
-  # Create nbhd composition/transition variables
-  mutate(composition = p_white >= 0.7,
-         transition = racialized_change >= 0.1)
-
-# Create neighbourhood_type variable
-CT <- 
-  CT |> 
-  mutate(neighbourhood_type = case_when(
-    composition & !transition ~ "white_stable",
-    composition & transition ~ "white_transition",
-    !composition & !transition ~ "mixed_stable",
-    !composition & transition ~ "mixed_transition"))
+  ungroup()
 
 
 # Pivot data for regressions ----------------------------------------------
 
 CT_final <-
   CT |> 
-  pivot_wider(names_from = year, values_from = 3:71) |> 
-  select(-value_change_2006, -value_change2_2006, -income_change_2006,
-         -income_change2_2006, -racialized_change_2006, -transition_2006,
-         -neighbourhood_type_2006) |> 
+  pivot_wider(names_from = year, values_from = population:racialized_change) |> 
+  select(-value_change_2006, -value_change_pct_2006, -income_change_2006,
+         -income_change_pct_2006, -racialized_change_2006) |> 
   rename(value_change = value_change_2016,
-         value_change2 = value_change2_2016,
+         value_change_pct = value_change_pct_2016,
          income_change = income_change_2016,
-         income_change2 = income_change2_2016,
-         racialized_change = racialized_change_2016,
-         transition = transition_2016,
-         neighbourhood_type = neighbourhood_type_2016)
-
-CT_final <- 
-  CT_final |> 
-  mutate(white_stable = neighbourhood_type == "white_stable",
-         white_transition = neighbourhood_type == "white_transition",
-         mixed_stable = neighbourhood_type == "mixed_stable",
-         mixed_transition = neighbourhood_type == "mixed_transition")
+         income_change_pct = income_change_pct_2016,
+         racialized_change = racialized_change_2016)
 
 
 # Add new race variable ---------------------------------------------------
@@ -264,20 +254,68 @@ CT_final <-
   mutate(black_ratio_change = black_ratio_2016 - black_ratio_2006)
 
 
-# Add distance to Parliament Hill -----------------------------------------
+# Add distance to Parliament Hill/city hall -------------------------------
 
-ph <- st_point(c(-75.70055444964218, 45.42343521835774)) |> 
-  st_sfc(crs = 4326) |> 
-  st_transform(32618)
+ch_montreal <- 
+  st_point(c(-73.55426429176865, 45.50887112946624)) |> 
+  st_sfc(crs = 4326)
+  
+ch_ottawa <- 
+  st_point(c(-75.70055444964218, 45.42343521835774)) |> 
+  st_sfc(crs = 4326)
 
-ph_dist <- 
+ch_toronto <- 
+  st_point(c(-79.38364973603952, 43.65276898078397)) |> 
+  st_sfc(crs = 4326)
+
+ch_calgary <- 
+  st_point(c(-114.0563303787967, 51.04631058985368)) |> 
+  st_sfc(crs = 4326)
+
+ch_edmonton <- 
+  st_point(c(-113.49036821589088, 53.544862921879975)) |> 
+  st_sfc(crs = 4326)
+
+ch_vancouver <- 
+  st_point(c(-123.1182923162272, 49.28260752585029)) |> 
+  st_sfc(crs = 4326)
+
+ch <- c(ch_montreal, ch_ottawa, ch_toronto, ch_calgary, ch_edmonton, 
+        ch_vancouver) |> 
+  st_as_sf() |> 
+  mutate(city = c("Montreal", "Ottawa", "Toronto", "Calgary", "Edmonton",
+                  "Vancouver"), .before = x) |> 
+  rename(geometry = x)
+
+ch_dist <- 
   CT_geom |> 
   distinct(census_tract, .keep_all = TRUE) |> 
-  mutate(ph_dist = as.numeric(st_distance(st_transform(geometry, 32618), ph))) |> 
+  rowwise() |> 
+  mutate(ph_dist = min(as.numeric(st_distance(geometry, ch)))) |> 
+  ungroup() |> 
   st_drop_geometry()
 
 CT_final <- 
   CT_final |> 
-  left_join(ph_dist, by = "census_tract")
+  left_join(ch_dist, by = "census_tract")
 
-CT_final$ph_dist
+
+# Scale variables ---------------------------------------------------------
+
+scale_fun <- function(x) (x - mean(x, na.rm = TRUE)) / sd(x, na.rm = TRUE)
+
+CT_scaled <- 
+  CT_final |> 
+  mutate(across(where(is.numeric), ~if_else(is.infinite(.x), NA_real_, .x))) |> 
+  mutate(across(where(is.numeric), ~if_else(is.nan(.x), NA_real_, .x))) |> 
+  mutate(across(where(is.numeric), scale_fun)) |> 
+  mutate(city = as.factor(city))
+
+CT_final |> 
+  select(black_ratio_2016, value_change_pct)
+
+
+mean(CT_scaled$black_ratio_2016, na.rm = TRUE)
+
+if_else(is.nan(CT_scaled$value_change_pct), NA_real_, CT_final$value_change_pct) |> 
+  mean(na.rm = TRUE)

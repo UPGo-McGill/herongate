@@ -1,18 +1,22 @@
 #### HERONGATE REGRESSIONS #####################################################
 
+library(lme4)
+library(lmerTest)
+
+
 # Descriptives ------------------------------------------------------------
 
-CT_final$neighbourhood_type |> table()
-CT_final$white_stable |> table()
-
-CT_final |> 
+CT_scaled |> 
   ggplot(aes(black_ratio_2016, value_2016)) +
   geom_point() +
   geom_smooth(method = "lm") + 
   theme_minimal()
 
-CT_final |> 
-  ggplot(aes(black_ratio_2016, value_change2)) +
+CT_scaled |> 
+  select(black_ratio_2016, value_change_pct)
+
+CT_scaled |> 
+  ggplot(aes(black_ratio_2016, value_change_pct)) +
   geom_point() +
   geom_smooth(method = "lm") + 
   theme_minimal()
@@ -23,113 +27,128 @@ CT_final |>
 # Black ratio + effect on home values
 model_2016_value <- 
   lm(value_2016 ~ black_ratio_2016 + income_2016 + detached_2016 +
-     rooms_2016 + p_children_2016 + p_college_2016 + ph_dist, data = CT_final)
+     rooms_2016 + p_children_2016 + p_college_2016 + ph_dist, data = CT_scaled)
 
 summary(model_2016_value)
 
-# Missing value
-missing_val_2016 <- which(!1:243 %in% names(model_2016_value$residuals))
+# MLM
+model_2016_value_mlm <- 
+  lmer(value_2016 ~ 1 + black_ratio_2016 + income_2016 + detached_2016 +
+       rooms_2016 + p_children_2016 + p_college_2016 + ph_dist + (1 | city), 
+     data = CT_scaled)
 
-CT_final |> 
-  slice(-missing_val_2016) |> 
-  mutate(residuals = model_2016_value$residuals) |> 
-  left_join(CT_geom, by = "census_tract") |> 
-  st_as_sf() |> 
-  ggplot() +
-  geom_sf(aes(fill = residuals), colour = "white", lwd = 0.2) +
-  scale_fill_fermenter(palette = "Spectral") +
-  theme_minimal()
+summary(model_2016_value_mlm)
 
-# Toronto: black ratio strong - effect
-lm(value_2016 ~ black_ratio_2016 + income_2016 + detached_2016 +
-     rooms_2016 + p_children_2016 + p_college_2016 + ph_dist, data = CT_final_TO) |> 
-  summary()
+model_2016_value_fe <- 
+  lm(value_2016 ~ black_ratio_2016 + income_2016 + detached_2016 +
+         rooms_2016 + p_children_2016 + p_college_2016 + ph_dist + city - 1, 
+       data = CT_scaled)
 
-# Vancouver: black ratio strong - effect
-lm(value_2016 ~ black_ratio_2016 + income_2016 + detached_2016 +
-     rooms_2016 + p_children_2016 + p_college_2016 + ph_dist, data = CT_final_VAN) |> 
-  summary()
+summary(model_2016_value_fe)
 
-# All CTs: black ratio + effect
-lm(value_2016 ~ black_ratio_2016 + income_2016 + detached_2016 +
-     rooms_2016 + p_children_2016 + p_college_2016, data = CT_final_all) |> 
-  summary()
+value_out <- stargazer::stargazer(model_2016_value_fe, type = "html")
+write_lines(value_out, "output/value_2016.html")
+
+
+  
+  
+
+
+
 
 
 # Value change ------------------------------------------------------------
 
 # Black ratio weak - effect on value change
-model_change <- 
-  lm(value_change2 ~ value_2006 + black_ratio_2016 + black_ratio_change + income_2016 + rooms_2016 + 
-       detached_2016 + p_college_2016 + p_children_2016 + ph_dist, data = CT_final)
+model_value_change <- 
+  lm(value_change_pct ~ value_2006 + black_ratio_2016 + black_ratio_change + 
+       income_2016 + rooms_2016 + detached_2016 + p_college_2016 + 
+       p_children_2016 + ph_dist, data = CT_scaled)
   
-summary(model_change)
+summary(model_value_change)
 
-# Missing value
-missing_val_change <- which(!1:243 %in% names(model_change$residuals))
+model_2016_value_change_mlm <- 
+  lmer(value_change_pct ~ 1 + value_2006 + black_ratio_2016 + black_ratio_change + 
+         income_2016 + detached_2016 + rooms_2016 + p_children_2016 + 
+         p_college_2016 + ph_dist + (1 | city), 
+       data = CT_scaled)
 
-CT_final |> 
-  slice(-missing_val_change) |> 
-  mutate(residuals = model_change$residuals) |> 
-  left_join(CT_geom, by = "census_tract") |> 
-  st_as_sf() |> 
-  ggplot() +
-  geom_sf(aes(fill = residuals), colour = "white", lwd = 0.2) +
-  scale_fill_fermenter(palette = "Spectral") +
-  theme_minimal()
+summary(model_2016_value_change_mlm)
 
-# TO: black ratio strong - effect
-lm(value_change2 ~ value_2006 + black_ratio_2016 + black_ratio_2006 + 
-     income_2016 + rooms_2016 + detached_2016 + p_college_2016 + 
-     p_children_2016 + ph_dist, 
-   data = filter(CT_final_TO, !is.nan(value_change2), !is.infinite(value_change2))) |> 
-  summary()
+model_2016_value_change_fe <- 
+  lm(value_change_pct ~ value_2006 + black_ratio_2016 + black_ratio_change + 
+       income_2016 + detached_2016 + rooms_2016 + p_children_2016 + 
+       p_college_2016 + ph_dist + city - 1, data = CT_scaled)
 
-# VAN: black ratio strong - effect
-lm(value_change2 ~ value_2006 + black_ratio_2016 + income_2016 + rooms_2016 + 
-     detached_2016 + p_college_2016 + p_children_2016 + ph_dist, 
-   data = CT_final_VAN) |> 
-  summary()
-
-# All CTs: strong - effect
-lm(value_change2 ~ value_2006 + black_ratio_2016 + income_2016 + rooms_2016 + 
-     detached_2016 + p_college_2016 + p_children_2016, 
-   data = filter(CT_final_all, !is.nan(value_change2), !is.infinite(value_change2))) |> 
-  summary()
+summary(model_2016_value_change_fe)
 
 
 
 
+# 2016 rent ---------------------------------------------------------------
+
+# Black ratio + effect on home values
+model_2016_rent <- 
+  lm(rent_2016 ~ black_ratio_2016 + income_2016 + detached_2016 +
+       rooms_2016 + p_children_2016 + p_college_2016 + ph_dist, data = CT_scaled)
+
+summary(model_2016_rent)
+
+# MLM
+model_2016_value_mlm <- 
+  lmer(value_2016 ~ 1 + black_ratio_2016 + income_2016 + detached_2016 +
+         rooms_2016 + p_children_2016 + p_college_2016 + ph_dist + (1 | city), 
+       data = CT_scaled)
+
+summary(model_2016_value_mlm)
+
+# FE
+model_2016_rent_fe <- 
+  lm(rent_2016 ~ black_ratio_2016 + income_2016 + detached_2016 +
+         rooms_2016 + p_children_2016 + p_college_2016 + ph_dist + city - 1, 
+       data = CT_scaled)
+
+summary(model_2016_rent_fe)
+
+
+
+# Rent change -------------------------------------------------------------
+
+# Black ratio strong - effect on rent change, but no effect of black_ratio_change
+model_rent_change <- 
+  lm(rent_change_2016 ~ value_2006 + black_ratio_2016 + black_ratio_change + 
+       income_2016 + rooms_2016 + detached_2016 + p_college_2016 + 
+       p_children_2016 + ph_dist, data = CT_scaled)
+
+summary(model_rent_change)
+
+model_rent_change_mlm <- 
+  lmer(rent_change_2016 ~ 1 + value_2006 + black_ratio_2016 + black_ratio_change + 
+       income_2016 + rooms_2016 + detached_2016 + p_college_2016 + 
+       p_children_2016 + ph_dist + (1 | city), data = CT_scaled)
+
+summary(model_rent_change_mlm)
+
+model_rent_change_fe <- 
+  lm(rent_change_2016 ~ value_2006 + black_ratio_2016 + black_ratio_change + 
+       income_2016 + rooms_2016 + detached_2016 + p_college_2016 + 
+       p_children_2016 + ph_dist + city - 1, data = CT_scaled)
+
+summary(model_rent_change_fe)
+
+
+
+
+summary(model_2016_value)
+summary(model_2016_value_mlm)
+summary(model_value_change)
+summary(model_value_change_mlm)
+summary(model_rent_change)
+summary(model_rent_change_mlm)
 
 
 
 
 
-
-lm(value_change2 ~ value_2006 + rooms_2016 + detached_2016 + income_change +
-     p_college_2016 + p_children_2016 + white_stable + mixed_stable + 
-     mixed_transition, data = CT_final) |> 
-  summary()
-
-lm(value_change2 ~ value_2006 + rooms_2016 + detached_2016 + income_change2 +
-     p_college_2016 + p_children_2016 + white_stable + mixed_stable + 
-     mixed_transition, data = CT_final) |> 
-  summary()
-
-
-lm(value_2016 ~ p_white_2016 + rooms_2016 + detached_2016 + income_2016,
-   data = CT_final) |> 
-  summary()
-
-
-lm(value_change ~ value_2006 + black_ratio_2016 + income_2016 + detached_2016 +
-     rooms_2016 + p_children_2016 + p_college_2016, data = CT_final) |> 
-  summary()
-
-
-
-
-lm(value_2016 ~ black_ratio_2016, data = CT_final_TO) |> 
-  summary()
 
 
