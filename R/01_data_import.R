@@ -134,11 +134,11 @@ vec_2016 <- c(
   notvismin = "v_CA16_3996"
   )
 
-
-# Build dataset -----------------------------------------------------------
-
 names(vec_2006) <- paste(names(vec_2006), "2006", sep = "___")
 names(vec_2016) <- paste(names(vec_2016), "2016", sep = "___")
+
+
+# Build dataset -----------------------------------------------------------
 
 CT_raw <- get_tongfen_ca_census(
   regions = list(CMA = c("35535", "24462", "59933", "48825", "505", "48835")), 
@@ -310,12 +310,3 @@ CT_scaled <-
   mutate(across(where(is.numeric), ~if_else(is.nan(.x), NA_real_, .x))) |> 
   mutate(across(where(is.numeric), scale_fun)) |> 
   mutate(city = as.factor(city))
-
-CT_final |> 
-  select(black_ratio_2016, value_change_pct)
-
-
-mean(CT_scaled$black_ratio_2016, na.rm = TRUE)
-
-if_else(is.nan(CT_scaled$value_change_pct), NA_real_, CT_final$value_change_pct) |> 
-  mean(na.rm = TRUE)

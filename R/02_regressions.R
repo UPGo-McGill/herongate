@@ -75,12 +75,12 @@ model_2016_value_change_mlm <-
 
 summary(model_2016_value_change_mlm)
 
-model_2016_value_change_fe <- 
+model_value_change_fe <- 
   lm(value_change_pct ~ value_2006 + black_ratio_2016 + black_ratio_change + 
        income_2016 + detached_2016 + rooms_2016 + p_children_2016 + 
        p_college_2016 + ph_dist + city - 1, data = CT_scaled)
 
-summary(model_2016_value_change_fe)
+summary(model_value_change_fe)
 
 
 
