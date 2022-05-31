@@ -395,11 +395,29 @@ All models are linear regressions with CMA acting as a fixed effect. (I.e. each 
 model_2016_value_fe <- 
   lm(value_2016 ~ black_ratio_2016 + income_2016 + detached_2016 +
        rooms_2016 + p_children_2016 + p_college_2016 + 
-       employed_2016 + density_2016 +
+       employed_2016 + density_2016 + poverty_2016 +
        ph_dist + city - 1, 
        data = CT_final)
 
 summary(model_2016_value_fe)
+
+```
+
+
+### 2016 owner-occupied housing value (per-city)
+
+``` {r value_2016_per_city}
+
+model_2016_value_fe_list <- 
+  map(unique(CT_final$city), ~{
+  lm(value_2016 ~ black_ratio_2016 + income_2016 + detached_2016 +
+       rooms_2016 + p_children_2016 + p_college_2016 + 
+       employed_2016 + density_2016 + poverty_2016 +
+       ph_dist, 
+     data = filter(CT_final, city == .x))
+}) |> set_names(unique(CT_final$city))
+
+map(model_2016_value_fe_list, summary)
 
 ```
 
@@ -410,14 +428,32 @@ summary(model_2016_value_fe)
 model_value_change_fe <- 
   lm(value_change_pct ~ value_2006 + black_ratio_2016 + black_ratio_change + 
        income_2016 + detached_2016 + rooms_2016 + p_children_2016 + 
-       p_college_2016 + 
-       employed_2016 + density_2016 + 
+       p_college_2016 + employed_2016 + density_2016 + poverty_2016 +
        ph_dist + city - 1, 
      data = CT_final)
 
 summary(model_value_change_fe)
 
 ```
+
+
+### 2006-2016 value change (per-city)
+
+``` {r value_change_per_city}
+
+model_value_change_fe_list <- 
+  map(unique(CT_final$city), ~{
+  lm(value_change_pct ~ value_2006 + black_ratio_2016 + black_ratio_change + 
+       income_2016 + detached_2016 + rooms_2016 + p_children_2016 + 
+       p_college_2016 + employed_2016 + density_2016 + poverty_2016 +
+       ph_dist, 
+     data = filter(CT_final, city == .x))
+    }) |> set_names(unique(CT_final$city))
+
+map(model_value_change_fe_list, summary)
+
+```
+
 
 ### 2016 rent
 
