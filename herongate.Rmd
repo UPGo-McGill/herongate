@@ -183,7 +183,7 @@ Next we separate out the tongfen geometries for future use.
 
 ``` {r geometries}
 
-CT_geom <- 
+CT_geom_raw <- 
   CT_raw |> 
   select(TongfenUID, geometry)
 
@@ -191,12 +191,15 @@ CT_geom <-
 
 ### Clean dataset
 
-Now we start to clean up the dataset, first by pivoting the table by year and then by sorting out the variables that were handled differently in the different census years. We also update `CT_geom` and remove the geometry from the main `CT` dataset.
+Now we start to clean up the dataset, first by adding a density variable, then pivoting the table by year and then sorting out the variables that were handled differently in the different census years. We also update `CT_geom` and remove the geometry from the main `CT` dataset.
 
 ``` {r cleanup_1}
 
 CT <- 
   CT_raw |> 
+  mutate(
+    density___2006 = units::drop_units(population___2006 / st_area(geometry)),
+    density___2016 = units::drop_units(population___2016 / st_area(geometry))) |>
   pivot_longer(-c(TongfenID:geometry),
                names_to = c("variable", "year"),
                names_sep = "___") |> 
@@ -215,7 +218,7 @@ CT <-
   mutate(minor = coalesce(minor, minor1 + minor2)) |> 
   select(-minor1, -minor2) |> 
   relocate(minor, .after = major) |> 
-  left_join(CT_geom, by = "TongfenUID") |> 
+  left_join(CT_geom_raw, by = "TongfenUID") |> 
   rename(census_tract = TongfenID) |> 
   select(-TongfenUID) |> 
   mutate(city = substr(census_tract, 1, 3), .after = census_tract) |> 
@@ -391,7 +394,9 @@ All models are linear regressions with CMA acting as a fixed effect. (I.e. each 
 
 model_2016_value_fe <- 
   lm(value_2016 ~ black_ratio_2016 + income_2016 + detached_2016 +
-         rooms_2016 + p_children_2016 + p_college_2016 + ph_dist + city - 1, 
+       rooms_2016 + p_children_2016 + p_college_2016 + 
+       employed_2016 + density_2016 +
+       ph_dist + city - 1, 
        data = CT_final)
 
 summary(model_2016_value_fe)
@@ -405,7 +410,10 @@ summary(model_2016_value_fe)
 model_value_change_fe <- 
   lm(value_change_pct ~ value_2006 + black_ratio_2016 + black_ratio_change + 
        income_2016 + detached_2016 + rooms_2016 + p_children_2016 + 
-       p_college_2016 + ph_dist + city - 1, data = CT_final)
+       p_college_2016 + 
+       employed_2016 + density_2016 + 
+       ph_dist + city - 1, 
+     data = CT_final)
 
 summary(model_value_change_fe)
 
