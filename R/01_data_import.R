@@ -69,7 +69,9 @@ vec_2006 <- c(
   westasian = "v_CA06_1311",
   korean = "v_CA06_1312",
   japanese = "v_CA06_1313",
-  notvismin = "v_CA06_1316"
+  notvismin = "v_CA06_1316",
+  total_imm = "v_CA06_474",
+  non_perm = "v_CA06_511"
   )
 
 
@@ -131,7 +133,9 @@ vec_2016 <- c(
   westasian = "v_CA16_3981",
   korean = "v_CA16_3984",
   japanese = "v_CA16_3987",
-  notvismin = "v_CA16_3996"
+  notvismin = "v_CA16_3996",
+  total_imm = "v_CA16_3405",
+  non_perm = "v_CA16_3435"
   )
 
 names(vec_2006) <- paste(names(vec_2006), "2006", sep = "___")
@@ -152,6 +156,9 @@ CT_geom <-
 
 CT <- 
   CT_raw |> 
+  mutate(
+    density___2006 = units::drop_units(population___2006 / st_area(geometry)),
+    density___2016 = units::drop_units(population___2016 / st_area(geometry))) |>
   pivot_longer(-c(TongfenID:geometry),
                names_to = c("variable", "year"),
                names_sep = "___") |> 
@@ -208,7 +215,10 @@ CT <-
          p_detached = detached / total_houses,
          p_racialized = (vismin + indigenous) / total_race,
          p_black = black / total_race,
-         p_white = (notvismin - indigenous) / total_race)
+         p_white = (notvismin - indigenous) / total_race,
+         p_non_perm = non_perm / total_imm,
+         p_rac_dis = (indigenous + black + arab + latin + filipino + 
+                        southasian + westasian) / total_race)
 
 CT <- 
   CT |> 
@@ -230,15 +240,18 @@ CT_final <-
   CT |> 
   pivot_wider(names_from = year, values_from = population:racialized_change) |> 
   select(-value_change_2006, -value_change_pct_2006, -income_change_2006,
-         -income_change_pct_2006, -racialized_change_2006) |> 
+         -income_change_pct_2006, -racialized_change_2006, 
+         -rent_change_2006, -rent_change_pct_2006) |> 
   rename(value_change = value_change_2016,
          value_change_pct = value_change_pct_2016,
+         rent_change = rent_change_2016,
+         rent_change_pct = rent_change_pct_2016,
          income_change = income_change_2016,
          income_change_pct = income_change_pct_2016,
          racialized_change = racialized_change_2016)
 
 
-# Add new race variable ---------------------------------------------------
+# Add new race/imm variables ----------------------------------------------
 
 CT_final <- 
   CT_final |> 
@@ -247,11 +260,26 @@ CT_final <-
               sum(total_race_2006, na.rm = TRUE)),
          black_ratio_2016 = p_black_2016 / 
            (sum(p_black_2016 * total_race_2016, na.rm = TRUE) / 
-              sum(total_race_2016, na.rm = TRUE)))
+              sum(total_race_2016, na.rm = TRUE)),
+         non_perm_ratio_2006 = p_non_perm_2006 / 
+           (sum(p_non_perm_2006 * total_imm_2006, na.rm = TRUE) / 
+              sum(total_imm_2006, na.rm = TRUE)),
+         non_perm_ratio_2016 = p_non_perm_2016 / 
+           (sum(p_non_perm_2016 * total_imm_2016, na.rm = TRUE) / 
+              sum(total_imm_2016, na.rm = TRUE)),
+         rac_dis_ratio_2006 = p_rac_dis_2006 / 
+           (sum(p_rac_dis_2006 * total_race_2006, na.rm = TRUE) / 
+              sum(total_race_2006, na.rm = TRUE)),
+         rac_dis_ratio_2016 = p_rac_dis_2016 / 
+           (sum(p_rac_dis_2016 * total_race_2016, na.rm = TRUE) / 
+              sum(total_race_2016, na.rm = TRUE))
+         )
 
 CT_final <- 
   CT_final |> 
-  mutate(black_ratio_change = black_ratio_2016 - black_ratio_2006)
+  mutate(black_ratio_change = black_ratio_2016 - black_ratio_2006,
+         non_perm_ratio_change = non_perm_ratio_2016 - non_perm_ratio_2006,
+         rac_dis_ratio_change = rac_dis_ratio_2016 - rac_dis_ratio_2006)
 
 
 # Add distance to Parliament Hill/city hall -------------------------------
@@ -310,3 +338,5 @@ CT_scaled <-
   mutate(across(where(is.numeric), ~if_else(is.nan(.x), NA_real_, .x))) |> 
   mutate(across(where(is.numeric), scale_fun)) |> 
   mutate(city = as.factor(city))
+
+qs::qsave(CT_scaled, file = "output/CT_scaled.qs")

@@ -3,6 +3,8 @@
 library(lme4)
 library(lmerTest)
 
+CT_scaled <- qread("output/CT_scaled.qs")
+
 
 # Descriptives ------------------------------------------------------------
 
@@ -13,10 +15,22 @@ CT_scaled |>
   theme_minimal()
 
 CT_scaled |> 
+  ggplot(aes(rac_dis_ratio_2016, value_2016)) +
+  geom_point() +
+  geom_smooth(method = "lm") + 
+  theme_minimal()
+
+CT_scaled |> 
   select(black_ratio_2016, value_change_pct)
 
 CT_scaled |> 
   ggplot(aes(black_ratio_2016, value_change_pct)) +
+  geom_point() +
+  geom_smooth(method = "lm") + 
+  theme_minimal()
+
+CT_scaled |> 
+  ggplot(aes(rac_dis_ratio_2016, value_change_pct)) +
   geom_point() +
   geom_smooth(method = "lm") + 
   theme_minimal()
@@ -39,22 +53,34 @@ model_2016_value_mlm <-
 
 summary(model_2016_value_mlm)
 
-model_2016_value_fe <- 
+# model_2016_value_fe <- 
   lm(value_2016 ~ black_ratio_2016 + income_2016 + detached_2016 +
          rooms_2016 + p_children_2016 + p_college_2016 + ph_dist + city - 1, 
-       data = CT_scaled)
+       data = CT_scaled) |> 
+    summary()
+  
+lm(value_2016 ~ rac_dis_ratio_2016 + non_perm_ratio_2016 + income_2016 + 
+     detached_2016 + rooms_2016 +  p_children_2016 + p_college_2016 + ph_dist + 
+     poverty_2016 + rent_2016 + rented_2016 + city - 1, data = CT_scaled) |> 
+  summary()
+
+
 
 summary(model_2016_value_fe)
+
+model_2016_rac_value_fe <- 
+  lm(value_2016 ~ rac_dis_ratio_2016 + non_perm_ratio_2016 + income_2016 + 
+       detached_2016 + rooms_2016 + p_children_2016 + p_college_2016 + ph_dist + 
+       city - 1, data = CT_scaled)
+
+summary(model_2016_rac_value_fe)
+
 
 value_out <- stargazer::stargazer(model_2016_value_fe, type = "html")
 write_lines(value_out, "output/value_2016.html")
 
 
   
-  
-
-
-
 
 
 # Value change ------------------------------------------------------------
@@ -82,7 +108,13 @@ model_value_change_fe <-
 
 summary(model_value_change_fe)
 
+model_rac_value_change_fe <- 
+  lm(value_change_pct ~ value_2006 + rac_dis_ratio_2016 + rac_dis_ratio_change + 
+       non_perm_ratio_2016 + non_perm_ratio_change +
+       income_2016 + detached_2016 + rooms_2016 + p_children_2016 + 
+       p_college_2016 + ph_dist + city - 1, data = CT_scaled)
 
+summary(model_rac_value_change_fe)
 
 
 # 2016 rent ---------------------------------------------------------------
@@ -110,6 +142,12 @@ model_2016_rent_fe <-
 
 summary(model_2016_rent_fe)
 
+model_2016_rac_rent_fe <- 
+  lm(rent_2016 ~ rac_dis_ratio_2016 + non_perm_ratio_2016 + income_2016 + 
+       detached_2016 + rooms_2016 + p_children_2016 + p_college_2016 + ph_dist + 
+       city - 1, data = CT_scaled)
+
+summary(model_2016_rac_rent_fe)
 
 
 # Rent change -------------------------------------------------------------
@@ -136,7 +174,13 @@ model_rent_change_fe <-
 
 summary(model_rent_change_fe)
 
+model_rent_rac_change_fe <- 
+  lm(rent_change_2016 ~ value_2006 + rac_dis_ratio_2016 + rac_dis_ratio_change + 
+       non_perm_ratio_2016 + non_perm_ratio_change +
+       income_2016 + rooms_2016 + detached_2016 + p_college_2016 + 
+       p_children_2016 + ph_dist + city - 1, data = CT_scaled)
 
+summary(model_rent_rac_change_fe)
 
 
 summary(model_2016_value)
@@ -145,10 +189,4 @@ summary(model_value_change)
 summary(model_value_change_mlm)
 summary(model_rent_change)
 summary(model_rent_change_mlm)
-
-
-
-
-
-
 
