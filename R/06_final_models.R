@@ -29,10 +29,10 @@ summary(model_2016_rent_fe)
 
 # Rent change
 model_rent_change_fe <- 
-  lm(rent_change_pct_2016 ~ rent_2006 + rac_dis_ratio_2016 + 
+  lm(rent_change_pct ~ rent_2006 + rac_dis_ratio_2016 + 
        rac_dis_ratio_change + non_perm_ratio_2016 + non_perm_ratio_change + 
        income_2016 + detached_2016 + rooms_2016 +  p_children_2016 + 
-       p_college_2016 + ph_dist + poverty_2016 + rent_2016 + rented_2016 +
+       p_college_2016 + ph_dist + poverty_2016 + rented_2016 +
        city - 1, data = CT_scaled)
 
 summary(model_rent_change_fe)

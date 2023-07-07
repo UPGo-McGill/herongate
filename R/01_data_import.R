@@ -71,7 +71,14 @@ vec_2006 <- c(
   japanese = "v_CA06_1313",
   notvismin = "v_CA06_1316",
   total_imm = "v_CA06_474",
-  non_perm = "v_CA06_511"
+  imm = "v_CA06_478",
+  non_perm = "v_CA06_511",
+  total_eth = "v_CA06_1317",
+  sudanese = "v_CA06_1479",
+  iraqi = "v_CA06_1491",
+  somali = "v_CA06_1477",
+  haitian = "v_CA06_1351",
+  Africa = "v_CA06_492"
   )
 
 
@@ -135,7 +142,15 @@ vec_2016 <- c(
   japanese = "v_CA16_3987",
   notvismin = "v_CA16_3996",
   total_imm = "v_CA16_3405",
-  non_perm = "v_CA16_3435"
+  imm = "v_CA16_3411",
+  non_perm = "v_CA16_3435",
+  total_eth = "v_CA16_3999",
+  sudanese = "v_CA16_4518",
+  iraqi = "v_CA16_4638",
+  somali = "v_CA16_4572",
+  haitian = "v_CA16_4296",
+  tot_orig = "v_CA16_3456",
+  Africa = "v_CA16_3549"
   )
 
 names(vec_2006) <- paste(names(vec_2006), "2006", sep = "___")
@@ -209,6 +224,8 @@ CT <-
   group_by(census_tract) |> 
   filter(n() == 2) |> 
   ungroup() |> 
+  # Deal with tot_orig
+  mutate(tot_orig = coalesce(tot_orig, total_imm)) |> 
   # Create percentage variables
   mutate(p_college = degree / total_students,
          p_children = under17 / total_children, # Previously was under17 / population
@@ -218,7 +235,10 @@ CT <-
          p_white = (notvismin - indigenous) / total_race,
          p_non_perm = non_perm / total_imm,
          p_rac_dis = (indigenous + black + arab + latin + filipino + 
-                        southasian + westasian) / total_race)
+                        southasian + westasian) / total_race,
+         p_eth = (sudanese + iraqi + haitian + somali) / total_eth,
+         p_afr = Africa / tot_orig,
+         p_imm = imm / total_imm)
 
 CT <- 
   CT |> 
@@ -230,7 +250,10 @@ CT <-
          value_change_pct = value_change / value[year == "2006"],
          income_change = income - income[year == "2006"],
          income_change_pct = income_change / income[year == "2006"],
-         racialized_change = p_racialized - p_racialized[year == "2006"]) |> 
+         racialized_change = p_racialized - p_racialized[year == "2006"],
+         eth_change = p_eth - p_eth[year == "2006"],
+         afr_change = p_afr - p_afr[year == "2006"],
+         imm_change = p_imm - p_imm[year == "2006"]) |> 
   ungroup()
 
 
@@ -238,17 +261,21 @@ CT <-
 
 CT_final <-
   CT |> 
-  pivot_wider(names_from = year, values_from = population:racialized_change) |> 
+  pivot_wider(names_from = year, values_from = population:imm_change) |> 
   select(-value_change_2006, -value_change_pct_2006, -income_change_2006,
-         -income_change_pct_2006, -racialized_change_2006, 
-         -rent_change_2006, -rent_change_pct_2006) |> 
+         -income_change_pct_2006, -racialized_change_2006, -eth_change_2006,
+         -afr_change_2006, -rent_change_2006, -rent_change_pct_2006,
+         -imm_change_2006) |> 
   rename(value_change = value_change_2016,
          value_change_pct = value_change_pct_2016,
          rent_change = rent_change_2016,
          rent_change_pct = rent_change_pct_2016,
          income_change = income_change_2016,
          income_change_pct = income_change_pct_2016,
-         racialized_change = racialized_change_2016)
+         racialized_change = racialized_change_2016,
+         eth_change = eth_change_2016,
+         afr_change = afr_change_2016,
+         imm_change = imm_change_2016)
 
 
 # Add new race/imm variables ----------------------------------------------
@@ -272,14 +299,35 @@ CT_final <-
               sum(total_race_2006, na.rm = TRUE)),
          rac_dis_ratio_2016 = p_rac_dis_2016 / 
            (sum(p_rac_dis_2016 * total_race_2016, na.rm = TRUE) / 
-              sum(total_race_2016, na.rm = TRUE))
+              sum(total_race_2016, na.rm = TRUE)),
+         eth_ratio_2006 = p_eth_2006 / 
+           (sum(p_eth_2006 * total_eth_2006, na.rm = TRUE) / 
+              sum(total_eth_2006, na.rm = TRUE)),
+         eth_ratio_2016 = p_eth_2016 / 
+           (sum(p_eth_2016 * total_eth_2016, na.rm = TRUE) / 
+              sum(total_eth_2016, na.rm = TRUE)),
+         afr_ratio_2006 = p_afr_2006 / 
+           (sum(p_afr_2006 * tot_orig_2006, na.rm = TRUE) / 
+              sum(tot_orig_2006, na.rm = TRUE)),
+         afr_ratio_2016 = p_afr_2016 / 
+           (sum(p_afr_2016 * tot_orig_2016, na.rm = TRUE) / 
+              sum(tot_orig_2016, na.rm = TRUE)),
+         imm_ratio_2006 = p_imm_2006 / 
+           (sum(p_imm_2006 * total_imm_2006, na.rm = TRUE) / 
+              sum(total_imm_2006, na.rm = TRUE)),
+         imm_ratio_2016 = p_imm_2016 / 
+           (sum(p_imm_2016 * total_imm_2016, na.rm = TRUE) / 
+              sum(total_imm_2016, na.rm = TRUE))
          )
 
 CT_final <- 
   CT_final |> 
   mutate(black_ratio_change = black_ratio_2016 - black_ratio_2006,
          non_perm_ratio_change = non_perm_ratio_2016 - non_perm_ratio_2006,
-         rac_dis_ratio_change = rac_dis_ratio_2016 - rac_dis_ratio_2006)
+         rac_dis_ratio_change = rac_dis_ratio_2016 - rac_dis_ratio_2006,
+         eth_ratio_change = eth_ratio_2016 - eth_ratio_2006,
+         afr_ratio_change = afr_ratio_2016 - afr_ratio_2006,
+         imm_ratio_change = imm_ratio_2016 - imm_ratio_2006)
 
 
 # Add distance to Parliament Hill/city hall -------------------------------
